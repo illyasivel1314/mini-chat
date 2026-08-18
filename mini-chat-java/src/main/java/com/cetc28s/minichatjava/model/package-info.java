@@ -1,0 +1,1 @@
+package com.cetc28s.minichatjava.model;

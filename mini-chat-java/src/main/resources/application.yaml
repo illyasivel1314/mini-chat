@@ -1,0 +1,8 @@
+spring:
+  application:
+    name: mini-chat-java
+  profiles:
+    active: @profiles.active@
+
+server:
+  port: 8888

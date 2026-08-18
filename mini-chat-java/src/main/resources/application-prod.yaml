@@ -1,0 +1,28 @@
+spring:
+  datasource:
+    # 数据库连接URL，包含地址、端口、数据库名及关键参数
+    url: jdbc:mysql://sh-cynosdbmysql-grp-d1wvjcik.sql.tencentcdb.com:24998/mini_chat?useUnicode=true&characterEncoding=UTF-8&useSSL=false&serverTimezone=Asia/Shanghai
+    username: illya        # 数据库用户名
+    password: uMe+WHVhU362MvR      # 数据库密码
+    driver-class-name: com.mysql.cj.jdbc.Driver # MySQL 8.0 及以上驱动（可选）
+
+  jpa:
+    # 控制是否在控制台打印SQL语句，方便调试
+    show-sql: false
+    hibernate:
+      # 控制数据库表结构的生成策略，非常重要！
+      ddl-auto: update
+    # 指定Hibernate的数据库方言，优化性能
+    database-platform: org.hibernate.dialect.MySQL5InnoDBDialect
+  jwt:
+    # 密钥
+    secret_key: "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ0aW1lU3RhbXAiOjE2MzkwNDc1NTMxNjksInVzZXJSb2xlIjoiUk9MRV9BRE1JTiIsInVzZXJJZCI6ImFkbWluIn0.UFQLvaiQ1AThx9Fa4SRqNg-b9HPJ9y1TlgQB4-F3pi0"
+    # 过期时间(毫秒)，默认一天
+    expiration_time: 86400000
+  file:
+    upload-dir: /home/ubuntu/wechat/files/
+    request-address: 146.56.197.54:8888/files/
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
