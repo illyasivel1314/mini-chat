@@ -1,5 +1,24 @@
 <template>
-  <div class="main-layout">
+  <div class="app-shell">
+    <nav class="top-nav">
+      <div class="nav-logo">Mini Chat</div>
+      <div class="nav-tabs">
+        <div
+          :class="['nav-tab', { active: activeView === 'chat' }]"
+          @click="activeView = 'chat'"
+        >聊天</div>
+        <div
+          :class="['nav-tab', { active: activeView === 'task' }]"
+          @click="activeView = 'task'"
+        >任务协同</div>
+      </div>
+      <div class="nav-user">
+        <span class="nav-user-name">{{ auth.userName }}</span>
+        <el-button text @click="handleLogout">退出</el-button>
+      </div>
+    </nav>
+
+    <div v-show="activeView === 'chat'" class="main-layout">
     <!-- Left Sidebar -->
     <aside class="sidebar">
       <!-- Current user header -->
@@ -145,6 +164,12 @@
         </el-button>
       </template>
     </el-dialog>
+    </div>
+
+    <!-- Task collaboration view -->
+    <div v-show="activeView === 'task'" class="task-view">
+      <Task />
+    </div>
   </div>
 </template>
 
@@ -161,6 +186,7 @@ import MessageList from '@/components/MessageList.vue'
 import FriendList from '@/components/FriendList.vue'
 import ChatWindow from '@/components/ChatWindow.vue'
 import ChatInput from '@/components/ChatInput.vue'
+import Task from '@/views/Task.vue'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -170,6 +196,7 @@ const webSocketStore = useWebSocket()
 
 const activeTab = ref('messages')
 const searchText = ref('')
+const activeView = ref('chat')
 
 // ---- Create Group ----
 const showCreateGroup = ref(false)
@@ -214,17 +241,92 @@ function handleUserMenu(command) {
   if (command === 'createGroup') {
     showCreateGroup.value = true
   } else if (command === 'logout') {
-    auth.logout()
-    router.push('/login')
+    handleLogout()
   }
+}
+
+function handleLogout() {
+  auth.logout()
+  router.push('/login')
 }
 </script>
 
 <style scoped>
-.main-layout {
+.app-shell {
   display: flex;
+  flex-direction: column;
   height: 100vh;
   background: #f5f5f5;
+}
+
+/* ---- Top navigation ---- */
+.top-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 52px;
+  padding: 0 20px;
+  background: #fff;
+  border-bottom: 1px solid #e0e0e0;
+  flex-shrink: 0;
+}
+
+.nav-logo {
+  font-size: 17px;
+  font-weight: 700;
+  color: #07C160;
+}
+
+.nav-tabs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nav-tab {
+  padding: 6px 18px;
+  font-size: 14px;
+  color: #606266;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.nav-tab:hover {
+  color: #07C160;
+  background: #f0faf4;
+}
+
+.nav-tab.active {
+  color: #07C160;
+  background: #e8f7ee;
+  font-weight: 600;
+}
+
+.nav-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.nav-user-name {
+  font-size: 14px;
+  color: #303133;
+}
+
+.main-layout {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  background: #f5f5f5;
+}
+
+.task-view {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 /* ---- Sidebar ---- */

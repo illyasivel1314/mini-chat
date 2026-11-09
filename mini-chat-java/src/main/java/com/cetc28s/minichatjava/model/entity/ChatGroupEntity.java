@@ -38,6 +38,12 @@ public class ChatGroupEntity implements Serializable {
     private String creatorId;
 
     /**
+     * 群主ID（可转让，初始=创建者）
+     */
+    @Column(name = "owner_id", nullable = false)
+    private String ownerId;
+
+    /**
      * 群组头像
      */
     @Column(name = "group_avatar")

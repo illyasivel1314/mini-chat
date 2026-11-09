@@ -83,6 +83,7 @@
 
 <script setup>
 import { ref } from 'vue'
+import { ElMessage } from 'element-plus'
 import { PictureFilled, VideoCameraFilled, FolderOpened } from '@element-plus/icons-vue'
 import { useChatStore } from '@/stores/chat.js'
 import { sampleGifs } from '@/utils/emoji.js'
@@ -95,6 +96,10 @@ const showEmoji = ref(false)
 const showSticker = ref(false)
 const imageInput = ref(null)
 const fileInput = ref(null)
+
+// 文件大小上限（对齐 PRD F04：图片 ≤10MB、文件 ≤50MB）
+const IMAGE_MAX_SIZE = 10 * 1024 * 1024
+const FILE_MAX_SIZE = 50 * 1024 * 1024
 
 // Convert GIF list to sticker format
 const sampleStickers = sampleGifs.map((url, i) => ({
@@ -151,6 +156,11 @@ function getFileExtension(filename) {
 async function onImageSelected(e) {
   const file = e.target.files?.[0]
   if (!file) return
+  if (file.size > IMAGE_MAX_SIZE) {
+    ElMessage.error('图片大小不能超过 10MB')
+    e.target.value = ''
+    return
+  }
   // Create object URL for local preview
   const url = await chatStore.uploadFile(file)
   chatStore.sendMessage(1, { fileAddress: url })
@@ -161,6 +171,11 @@ async function onImageSelected(e) {
 async function onFileSelected(e) {
   const file = e.target.files?.[0]
   if (!file) return
+  if (file.size > FILE_MAX_SIZE) {
+    ElMessage.error('文件大小不能超过 50MB')
+    e.target.value = ''
+    return
+  }
 
   // Build structured file content
   const url = await chatStore.uploadFile(file)

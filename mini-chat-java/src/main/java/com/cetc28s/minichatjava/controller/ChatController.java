@@ -3,7 +3,9 @@ package com.cetc28s.minichatjava.controller;
 import com.cetc28s.minichatjava.model.context.UserContext;
 import com.cetc28s.minichatjava.model.dto.ChatFriendDto;
 import com.cetc28s.minichatjava.model.dto.ChatMessageDto;
+import com.cetc28s.minichatjava.model.enums.ChatTypeEnum;
 import com.cetc28s.minichatjava.service.MessageService;
+import com.cetc28s.minichatjava.service.ConversationService;
 import com.cetc28s.minichatjava.utils.JwtTokenUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,6 +41,12 @@ public class ChatController {
 
     @Resource
     private MessageService messageService;
+
+    @Resource
+    private ConversationService conversationService;
+
+    @Resource
+    private SimpMessagingTemplate messagingTemplate;
 
     /**
      * 获取私聊历史消息
@@ -80,5 +88,25 @@ public class ChatController {
         // 当前用户id
         String currentUserId = UserContext.getCurrentUser();
         messageService.markAsRead(currentUserId, userId);
+    }
+
+    /**
+     * 撤回消息（仅本人、发送后 2 分钟内）
+     */
+    @PostMapping("/message/recall")
+    public ChatMessageDto recall(@RequestParam String messageId) {
+        String currentUserId = UserContext.getCurrentUser();
+        ChatMessageDto dto = messageService.recallMessage(messageId, currentUserId);
+        // 按原聊天类型推送给相关方
+        if (ChatTypeEnum.PRIVATE.getValue() == dto.getChatType()) {
+            messagingTemplate.convertAndSendToUser(dto.getReceiverId(), "/queue/private", dto);
+            messagingTemplate.convertAndSendToUser(currentUserId, "/queue/private", dto);
+        } else if (ChatTypeEnum.GROUP.getValue() == dto.getChatType()) {
+            // 群聊撤回同样逐人私聊推送
+            for (String memberId : conversationService.listGroupMemberIds(dto.getReceiverId())) {
+                messagingTemplate.convertAndSendToUser(memberId, "/queue/private", dto);
+            }
+        }
+        return dto;
     }
 }

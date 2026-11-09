@@ -19,10 +19,10 @@
         class="login-form"
         @submit.prevent="handleRegister"
       >
-        <el-form-item prop="account">
+        <el-form-item prop="phone">
           <el-input
-            v-model="form.account"
-            placeholder="请输入工号"
+            v-model="form.phone"
+            placeholder="请输入手机号"
             size="large"
             :prefix-icon="User"
             clearable
@@ -32,7 +32,7 @@
         <el-form-item prop="name">
           <el-input
             v-model="form.name"
-            placeholder="请输入姓名"
+            placeholder="请输入姓名（2-20 字符）"
             size="large"
             :prefix-icon="UserFilled"
             clearable
@@ -43,7 +43,7 @@
           <el-input
             v-model="form.password"
             type="password"
-            placeholder="请输入密码"
+            placeholder="请输入密码（6-20 位）"
             size="large"
             :prefix-icon="Lock"
             show-password
@@ -63,6 +63,16 @@
           />
         </el-form-item>
 
+        <el-form-item prop="account">
+          <el-input
+            v-model="form.account"
+            placeholder="请输入工号（可选）"
+            size="large"
+            :prefix-icon="User"
+            clearable
+          />
+        </el-form-item>
+
         <el-form-item prop="position">
           <el-select
             v-model="form.position"
@@ -70,19 +80,42 @@
             size="large"
             style="width: 100%"
           >
-            <el-option label="前端开发工程师" value="0" />
-            <el-option label="Java开发工程师" value="1" />
-            <el-option label="C开发工程师" value="2" />
-            <el-option label="测试工程师" value="3" />
-            <el-option label="其他" value="4" />
+            <el-option label="负责人" value="0" />
+            <el-option label="Java 开发" value="1" />
+            <el-option label="前端开发" value="2" />
+            <el-option label="C 端开发" value="3" />
+            <el-option label="三方测试" value="4" />
+            <el-option label="内部测试" value="5" />
           </el-select>
+        </el-form-item>
+
+        <el-form-item prop="duty">
+          <el-select
+            v-model="form.duty"
+            placeholder="请选择职责"
+            size="large"
+            style="width: 100%"
+          >
+            <el-option label="项目负责人" value="0" />
+            <el-option label="开发员" value="1" />
+            <el-option label="测试员" value="2" />
+          </el-select>
+        </el-form-item>
+
+        <el-form-item prop="detail">
+          <el-input
+            v-model="form.detail"
+            type="textarea"
+            placeholder="详细信息（可选）"
+            :rows="2"
+          />
         </el-form-item>
 
         <el-form-item prop="positionDescription">
           <el-input
             v-model="form.positionDescription"
             type="textarea"
-            placeholder="请简述您的职责"
+            placeholder="请简述您的职责（可选）"
             :rows="3"
           />
         </el-form-item>
@@ -111,26 +144,25 @@
 <script setup>
 import { reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { User, Lock, UserFilled, Plus, Edit } from '@element-plus/icons-vue'
+import { User, Lock, UserFilled } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '@/stores/auth.js'
 
 const router = useRouter()
 const auth = useAuthStore()
 const formRef = ref(null)
-const fileInputRef = ref(null)
 const loading = ref(false)
-const avatarPreview = ref('')
-const selectedFile = ref(null)
 
 const form = reactive({
-  account: '',
+  phone: '',
   name: '',
   password: '',
   confirmPassword: '',
+  account: '',
   position: '',
-  positionDescription: '',
-  avatar: ''
+  duty: '',
+  detail: '',
+  positionDescription: ''
 })
 
 const validateConfirmPassword = (rule, value, callback) => {
@@ -144,11 +176,22 @@ const validateConfirmPassword = (rule, value, callback) => {
 }
 
 const rules = {
-  account: [{ required: true, message: '请输入工号', trigger: 'blur' }],
-  name: [{ required: true, message: '请输入姓名', trigger: 'blur' }],
-  password: [{ required: true, message: '请输入密码', trigger: 'blur' }],
+  phone: [
+    { required: true, message: '请输入手机号', trigger: 'blur' },
+    { pattern: /^1[3-9]\d{9}$/, message: '手机号格式不正确', trigger: 'blur' }
+  ],
+  name: [
+    { required: true, message: '请输入姓名', trigger: 'blur' },
+    { min: 2, max: 20, message: '姓名长度需为 2-20 字符', trigger: 'blur' }
+  ],
+  password: [
+    { required: true, message: '请输入密码', trigger: 'blur' },
+    { min: 6, max: 20, message: '密码长度为 6-20 位', trigger: 'blur' }
+  ],
   confirmPassword: [{ required: true, validator: validateConfirmPassword, trigger: 'blur' }],
-  position: [{ required: true, message: '请选择岗位', trigger: 'change' }]
+  account: [{ max: 20, message: '工号长度不能超过 20 字符', trigger: 'blur' }],
+  position: [{ required: true, message: '请选择岗位', trigger: 'change' }],
+  duty: [{ required: true, message: '请选择职责', trigger: 'change' }]
 }
 
 // Re-validate confirmPassword when password changes
@@ -157,11 +200,6 @@ watch(() => form.password, () => {
     formRef.value?.validateField('confirmPassword')
   }
 })
-
-function triggerFileInput() {
-  fileInputRef.value?.click()
-}
-
 
 async function handleRegister() {
   if (!formRef.value) return
@@ -174,8 +212,8 @@ async function handleRegister() {
   loading.value = true
   try {
     await auth.register(form)
-    ElMessage.success('注册成功')
-    router.push('/login')
+    ElMessage.success('注册成功，正在进入聊天页')
+    router.push('/chatWindow')
   } catch (e) {
     console.log(e)
   } finally {
@@ -251,72 +289,6 @@ async function handleRegister() {
   margin-top: 4px;
 }
 
-/* ---- Avatar Upload ---- */
-.avatar-upload {
-  display: flex;
-  justify-content: center;
-  cursor: pointer;
-}
-
-.avatar-placeholder {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  width: 100%;
-  padding: 16px;
-  border: 2px dashed #dcdfe6;
-  border-radius: 8px;
-  color: #909399;
-  font-size: 13px;
-  transition: border-color 0.2s, color 0.2s;
-}
-
-.avatar-placeholder:hover {
-  border-color: #07C160;
-  color: #07C160;
-}
-
-.avatar-preview-wrapper {
-  position: relative;
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-.avatar-preview {
-  display: block;
-}
-
-.avatar-mask {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0, 0, 0, 0.4);
-  color: #fff;
-  opacity: 0;
-  transition: opacity 0.2s;
-  cursor: pointer;
-}
-
-.avatar-preview-wrapper:hover .avatar-mask {
-  opacity: 1;
-}
-
-.upload-tip {
-  margin: 6px 0 0;
-  font-size: 12px;
-  color: #909399;
-  text-align: center;
-}
-
-.upload-tip.success {
-  color: #07C160;
-}
-
-/* ---- Footer ---- */
 .login-footer {
   margin-top: 20px;
   text-align: center;

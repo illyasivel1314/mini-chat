@@ -33,11 +33,11 @@ public class UserController {
     }
 
     /**
-     * 用户注册
+     * 用户注册（注册成功后自动登录，返回 token）
      */
     @PostMapping("/register")
-    public void register(@Validated @RequestBody UserRegisterRequest request) {
-        userService.register(request);
+    public UserLoginDto register(@Validated @RequestBody UserRegisterRequest request) {
+        return userService.register(request);
     }
 
     /**
@@ -75,10 +75,10 @@ public class UserController {
     }
 
     /**
-     * 获取群聊人数
+     * 获取群聊成员列表
      */
     @GetMapping("/group/members")
-    public int acquireGroupMembers(@RequestParam @NotNull String groupId) {
+    public List<UserFriendDto> acquireGroupMembers(@RequestParam @NotNull String groupId) {
         return userService.acquireGroupMembers(groupId);
     }
 
@@ -99,10 +99,11 @@ public class UserController {
     }
 
     /**
-     * 离开
+     * 离开群聊（退群用户 ID 从 token 获取）
      */
-    @GetMapping("/group/leave")
-    public void leaveGroup(@RequestParam("groupId") String groupId, @RequestParam("userId") String userId) {
-        userService.leaveGroup(groupId, userId);
+    @PostMapping("/group/leave")
+    public void leaveGroup(@RequestBody GroupLeaveRequest request) {
+        String currentUserId = UserContext.getCurrentUser();
+        userService.leaveGroup(request.getGroupId(), currentUserId);
     }
 }

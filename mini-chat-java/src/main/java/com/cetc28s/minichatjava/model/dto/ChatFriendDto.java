@@ -8,6 +8,9 @@ public class ChatFriendDto {
     // 接收者id
     private String receiveId;
 
+    // 会话ID（conversationId，前端据此识别消息归属会话）
+    private String conversationId;
+
     // 类型(group/friend)
     private int chatType;
 

@@ -6,3 +6,8 @@ spring:
 
 server:
   port: 8888
+
+# admin 后台独立账号（F12，与注册用户体系隔离）
+admin:
+  username: admin
+  password: admin123

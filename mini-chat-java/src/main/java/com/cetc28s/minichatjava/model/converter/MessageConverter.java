@@ -79,6 +79,12 @@ public interface MessageConverter {
             @Mapping(target = "content", source = "sendMessageVo.content"),
             @Mapping(target = "timestamp", expression = "java(MAPPER.generateTimestamp())"),
             @Mapping(target = "isRead", constant = "false"),
+            @Mapping(target = "replyTo", source = "sendMessageVo.replyTo"),
+            @Mapping(target = "atUsers", source = "sendMessageVo.atUsers"),
+            @Mapping(target = "atAll", source = "sendMessageVo.atAll"),
+            @Mapping(target = "forwardFrom", source = "sendMessageVo.forwardFrom"),
+            @Mapping(target = "conversationId", ignore = true),
+            @Mapping(target = "recalled", ignore = true),
     })
     ChatMessageDto convertChatMessageDto(SendMessageVo sendMessageVo, String senderId);
 
@@ -88,11 +94,17 @@ public interface MessageConverter {
             @Mapping(target = "senderName", source = "userEntity.name"),
             @Mapping(target = "senderAvatar", source = "userEntity.avatar"),
             @Mapping(target = "receiverId", source = "messageEntity.receiverId"),
+            @Mapping(target = "conversationId", source = "messageEntity.conversationId"),
             @Mapping(target = "chatType", source = "messageEntity.chatType"),
             @Mapping(target = "contentType", source = "messageEntity.contentType"),
             @Mapping(target = "content", source = "messageEntity.content"),
             @Mapping(target = "timestamp", source = "messageEntity.timestamp"),
             @Mapping(target = "isRead", source = "messageEntity.isRead"),
+            @Mapping(target = "replyTo", source = "messageEntity.replyTo"),
+            @Mapping(target = "atUsers", source = "messageEntity.atUsers"),
+            @Mapping(target = "atAll", source = "messageEntity.atAll"),
+            @Mapping(target = "forwardFrom", source = "messageEntity.forwardFrom"),
+            @Mapping(target = "recalled", source = "messageEntity.recalled"),
     })
     ChatMessageDto convertChatMessageDto(MessageEntity messageEntity, UserEntity userEntity);
 

@@ -60,12 +60,16 @@ public class UserService {
      * @return 用户登录信息（含token）
      */
     public UserLoginDto login(UserLoginRequest request) {
-        String account = request.getAccount();
+        String phone = request.getPhone();
         String password = request.getPassword();
-        // 根据账号查询用户
-        UserEntity user = userDao.findByAccount(account);
+        // 根据手机号查询用户
+        UserEntity user = userDao.findByPhone(phone);
         if (Objects.isNull(user)) {
             throw new BusinessException(ErrorCodeEnum.USER_NOT_FOUND);
+        }
+        // 逻辑删除账号无法登录
+        if (Boolean.TRUE.equals(user.getDeleted())) {
+            throw new BusinessException(ErrorCodeEnum.ACCOUNT_DELETED);
         }
         // 验证密码
         if (!user.getPassword().equals(password)) {
@@ -79,21 +83,25 @@ public class UserService {
     }
 
     /**
-     * 用户注册
+     * 用户注册（注册成功后自动登录，返回用户信息与 token）
      * @param request 注册请求
+     * @return 用户登录信息（含 token）
      */
-    public void register(UserRegisterRequest request) {
-        String account = request.getAccount();
-        // 判断工号是否重复
-        UserEntity existingUser = userDao.findByAccount(account);
-        if (Objects.nonNull(existingUser)) {
-            throw new BusinessException(ErrorCodeEnum.DUPLICATE_ACCOUNT);
+    public UserLoginDto register(UserRegisterRequest request) {
+        // 判断手机号是否重复
+        if (userDao.existsByPhone(request.getPhone())) {
+            throw new BusinessException(ErrorCodeEnum.DUPLICATE_PHONE);
         }
 
         // 构建用户实体
         UserEntity userEntity = UserConverter.MAPPER.convertUserEntity(request);
         // 保存到数据库
         userDao.save(userEntity);
+
+        // 注册后自动登录：生成 token
+        UserLoginDto userLoginDto = UserConverter.MAPPER.convertUserLoginDto(userEntity);
+        userLoginDto.setToken(jwtTokenUtil.generateToken(userEntity.getId()));
+        return userLoginDto;
     }
 
     /**
@@ -103,6 +111,7 @@ public class UserService {
     public List<UserFriendDto> acquireAllFriend() {
         return userDao.findAll()
                 .stream()
+                .filter(user -> !Boolean.TRUE.equals(user.getDeleted()))
                 .map(UserConverter.MAPPER::convertUserFriendDto)
                 .collect(Collectors.toList());
     }
@@ -112,7 +121,16 @@ public class UserService {
      * @return List<UserGroupDto>
      */
     public List<UserGroupDto> acquireAllGroup(String currentUserId) {
-        return chatGroupDao.findAllByIdIn(Collections.singleton(currentUserId))
+        // 先查当前用户加入的群成员关系，再查对应群信息
+        List<GroupMemberEntity> members = groupMemberDao.findByUserId(currentUserId);
+        if (CollectionUtils.isEmpty(members)) {
+            return Collections.emptyList();
+        }
+        List<String> groupIds = members.stream()
+                .map(GroupMemberEntity::getGroupId)
+                .distinct()
+                .collect(Collectors.toList());
+        return chatGroupDao.findAllByIdIn(groupIds)
                 .stream().map(UserConverter.MAPPER::convertUserGroupDto)
                 .collect(Collectors.toList());
     }
@@ -140,6 +158,7 @@ public class UserService {
                 .id(CommonUtil.generateUuid())
                 .groupName(groupCreateRequest.getName())
                 .creatorId(currentUserId)
+                .ownerId(currentUserId)
                 .groupAvatar(groupCreateRequest.getAvatar())
                 .createTime(CommonUtil.generateTimestamp())
                 .build();
@@ -192,11 +211,23 @@ public class UserService {
     }
 
     /**
-     * 获取群聊人数
+     * 获取群聊成员列表
      * @param groupId 群聊id
+     * @return 群成员列表
      */
-    public int acquireGroupMembers(String groupId) {
-        return groupMemberDao.countByGroupId(groupId);
+    public List<UserFriendDto> acquireGroupMembers(String groupId) {
+        List<GroupMemberEntity> members = groupMemberDao.findByGroupId(groupId);
+        if (CollectionUtils.isEmpty(members)) {
+            return Collections.emptyList();
+        }
+        List<String> userIds = members.stream()
+                .map(GroupMemberEntity::getUserId)
+                .collect(Collectors.toList());
+        return userDao.findAllByIdIn(userIds)
+                .stream()
+                .filter(user -> !Boolean.TRUE.equals(user.getDeleted()))
+                .map(UserConverter.MAPPER::convertUserFriendDto)
+                .collect(Collectors.toList());
     }
 
 

@@ -33,9 +33,17 @@ public interface UserConverter {
         return PinyinUtil.getPinyin(value);
     }
 
+    @Named("generateTimestamp")
+    default long generateTimestamp() {
+        return CommonUtil.generateTimestamp();
+    }
+
     @Mappings({
             @Mapping(target = "id", expression = "java(MAPPER.generateUuid())"),
             @Mapping(target = "pinyin", source = "name", qualifiedByName = "generatePinyin"),
+            @Mapping(target = "deleted", constant = "false"),
+            @Mapping(target = "createTime", expression = "java(MAPPER.generateTimestamp())"),
+            @Mapping(target = "updateTime", ignore = true),
     })
     UserEntity convertUserEntity(UserRegisterRequest request);
 

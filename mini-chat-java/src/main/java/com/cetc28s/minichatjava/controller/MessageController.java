@@ -6,6 +6,7 @@ import com.cetc28s.minichatjava.model.dto.ChatMessageDto;
 import com.cetc28s.minichatjava.model.entity.UserEntity;
 import com.cetc28s.minichatjava.model.enums.ChatTypeEnum;
 import com.cetc28s.minichatjava.model.vo.SendMessageVo;
+import com.cetc28s.minichatjava.service.ConversationService;
 import com.cetc28s.minichatjava.service.MessageService;
 import com.cetc28s.minichatjava.service.UserService;
 import com.cetc28s.minichatjava.utils.CommonUtil;
@@ -31,6 +32,9 @@ public class MessageController {
     @Resource
     private UserService userService;
 
+    @Resource
+    private ConversationService conversationService;
+
 
     // ==================== WebSocket 消息处理 ====================
     // /topic：广播消息代理，所有订阅者都能收到
@@ -50,8 +54,16 @@ public class MessageController {
         String currentUserId = principal.getName();
         // 将数据进行打包
         ChatMessageDto chatMessageDto = MessageConverter.MAPPER.convertChatMessageDto(message, currentUserId);
+        // 会话ID（sessionWindowId）
+        String conversationId = conversationService.resolveConversationId(
+                message.getChatType(), currentUserId, message.getReceiverId());
+        chatMessageDto.setConversationId(conversationId);
         // 保存消息到数据库
         messageService.saveAndBuildMessage(chatMessageDto);
+        // 维护会话与未读/@角标
+        conversationService.onMessageSent(message.getChatType(), conversationId,
+                currentUserId, message.getReceiverId(), message.getAtUsers(),
+                Boolean.TRUE.equals(message.getAtAll()));
         // 获取数据类型
         if (ChatTypeEnum.PRIVATE.getValue() == message.getChatType()) {
             // 私聊：发送给接收者
@@ -59,8 +71,24 @@ public class MessageController {
             // 同时发送给发送者（确认消息已发送）
             messagingTemplate.convertAndSendToUser(currentUserId, "/queue/private", chatMessageDto);
         } else if (ChatTypeEnum.GROUP.getValue() == message.getChatType()) {
-            // 群聊：广播到群组 topic
-            messagingTemplate.convertAndSend("/topic/group", chatMessageDto);
+            // 群聊：获取会话内全部成员，逐个私聊推送（前端按 conversationId 归属会话）
+            for (String memberId : conversationService.listGroupMemberIds(message.getReceiverId())) {
+                messagingTemplate.convertAndSendToUser(memberId, "/queue/private", chatMessageDto);
+            }
+        } else if (ChatTypeEnum.SELF.getValue() == message.getChatType()) {
+            // 自发会话：仅回显给发送者
+            messagingTemplate.convertAndSendToUser(currentUserId, "/queue/private", chatMessageDto);
         }
+    }
+
+    /**
+     * 心跳处理：客户端发送到 /app/chat.ping，服务端回 /queue/pong
+     */
+    @MessageMapping("/chat.ping")
+    public void handlePing(@Payload Map<String, Object> ping, Principal principal) {
+        if (principal == null) {
+            return;
+        }
+        messagingTemplate.convertAndSendToUser(principal.getName(), "/queue/pong", "pong");
     }
 }

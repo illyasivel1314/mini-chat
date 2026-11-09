@@ -23,6 +23,10 @@ import java.util.UUID;
 public class FileUploadController {
     private static final Logger log = LoggerFactory.getLogger(FileUploadController.class);
 
+    // 单文件大小上限（对齐 PRD F04：图片 ≤10MB、文件 ≤50MB）
+    private static final long IMAGE_MAX_SIZE = 10 * 1024 * 1024L;
+    private static final long FILE_MAX_SIZE = 50 * 1024 * 1024L;
+
     // 从配置文件中注入上传目录
     @Value("${spring.file.upload-dir}")
     private String uploadDir;
@@ -35,6 +39,16 @@ public class FileUploadController {
         // 1. 校验文件是否为空
         if (file.isEmpty()) {
             throw new BusinessException(ErrorCodeEnum.FILE_EMPTY);
+        }
+
+        // 2. 按类型校验大小：图片 ≤10MB，文件 ≤50MB（对齐 PRD F04）
+        long size = file.getSize();
+        boolean isImage = file.getContentType() != null && file.getContentType().startsWith("image/");
+        if (isImage && size > IMAGE_MAX_SIZE) {
+            throw new BusinessException(ErrorCodeEnum.IMAGE_TOO_LARGE);
+        }
+        if (!isImage && size > FILE_MAX_SIZE) {
+            throw new BusinessException(ErrorCodeEnum.FILE_TOO_LARGE);
         }
 
         try {

@@ -11,8 +11,8 @@ export const useWebSocket = defineStore('webSocket', () => {
 
     // 连接
     const connect = () => {
-        // const socket = new SockJS('http://localhost:8888/ws');
-        const socket = new SockJS('http://146.56.197.54:8888/ws');
+        const socket = new SockJS('http://localhost:8888/ws');
+        // const socket = new SockJS('http://146.56.197.54:8888/ws');
         stompClient.value = new Client({
             webSocketFactory: () => socket,
             // 连接时传递用户标识
@@ -26,33 +26,19 @@ export const useWebSocket = defineStore('webSocket', () => {
                 isConnected.value = true;
                 console.log('WebSocket 连接成功');
                 
-                // 1. 订阅群聊
-                stompClient.value?.subscribe('/topic/group', (message) => {
-                    const data = JSON.parse(message.body);
-                    useChatStore().uploadGroupLatestMessage(data);  // Update the chat store with the latest message
-                    console.log(data);
-                });
-
-                // 2. 订阅系统消息（广播）
-                stompClient.value?.subscribe('/queue/system', (message) => {
-                    const data = JSON.parse(message.body);
-                    useChatStore().loadConversations();  // Update the chat store with the latest message
-                    console.log(data);
-                });
-
-                // 3. 订阅私聊（/user 前缀会被自动解析为当前用户）
+                // 1. 私聊/群聊消息统一走 /user/queue/private，前端按 conversationId 归属会话
                 stompClient.value?.subscribe('/user/queue/private', (message) => {
                     const data = JSON.parse(message.body);
-                    useChatStore().uploadPrivateLatestMessage(data);  // Update the chat store with the latest message
+                    useChatStore().uploadMessage(data);
                 });
 
-                // 4. 订阅定向系统消息
-                // stompClient.value?.subscribe('/user/queue/system', (message) => {
-                //     const data = JSON.parse(message.body);
-                //     messages.value.push(data);
-                // });
+                // 2. 系统消息广播：收到后按 receiverId 过滤出属于自己的
+                stompClient.value?.subscribe('/queue/system', (message) => {
+                    const data = JSON.parse(message.body);
+                    useChatStore().uploadSystemMessage(data);
+                });
 
-                // 5. 订阅心跳
+                // 3. 订阅心跳
                 stompClient.value?.subscribe('/queue/pong', (message) => {
                     console.log('收到心跳响应:', message.body);
                 });

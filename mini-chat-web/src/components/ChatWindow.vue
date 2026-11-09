@@ -50,10 +50,18 @@
             <span>{{ formatDate(msg.timestamp) }}</span>
           </div>
 
-          <div :class="['message-row', messageClass(msg)]">
+          <div
+            :class="['message-row', messageClass(msg)]"
+            @contextmenu.prevent="openContextMenu($event, msg)"
+          >
             <!-- System message -->
             <div v-if="msg.chatType === 2" class="system-msg">
               <span>{{ resolveTextContent(msg) }}</span>
+            </div>
+
+            <!-- Recalled message -->
+            <div v-else-if="msg.recalled" class="recalled-msg">
+              <span>{{ isSelfMessage(msg) ? '你' : resolveSenderName(msg) }} 撤回了一条消息</span>
             </div>
 
             <!-- Regular message -->
@@ -67,6 +75,12 @@
 
               <!-- Message content wrapper -->
               <div :class="['msg-content-wrapper', isSelfMessage(msg) ? 'wrapper-self' : 'wrapper-other']">
+                <!-- Capability badges (@/回复/转发) -->
+                <div v-if="msg.replyTo || msg.forwardFrom || isMentioned(msg)" class="msg-badges">
+                  <span v-if="msg.replyTo" class="msg-badge">回复</span>
+                  <span v-if="msg.forwardFrom" class="msg-badge">转发</span>
+                  <span v-if="isMentioned(msg)" class="msg-badge msg-badge-at">@我</span>
+                </div>
                 <!-- Sender name (group chat, above content) -->
                 <div
                   v-if="chatStore.activeChat?.type === 1 && !isSelfMessage(msg)"
@@ -328,11 +342,21 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <!-- Recall context menu -->
+    <div
+      v-if="contextMenu.visible"
+      class="recall-menu"
+      :style="{ left: contextMenu.x + 'px', top: contextMenu.y + 'px' }"
+      @click.stop
+    >
+      <div class="recall-menu-item" @click="handleRecall">撤回</div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, watch, nextTick, onMounted, computed } from 'vue'
+import { ref, reactive, watch, nextTick, onMounted, onBeforeUnmount, computed } from 'vue'
 import { Refresh, ArrowDown, Loading, InfoFilled, Plus } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useAuthStore } from '@/stores/auth.js'
@@ -351,6 +375,7 @@ const imageVisible = ref(false)
 const previewUrl = ref('')
 const loadingHistory = ref(false)
 const prevScrollHeight = ref(0)
+const contextMenu = reactive({ visible: false, x: 0, y: 0, message: null })
 
 const memberCount = computed(() => {
   // if (chatStore.activeChat?.type !== 1) return 0;
@@ -639,8 +664,46 @@ async function loadMore() {
 // ---- Message display helpers ----
 
 function messageClass(msg) {
-  if (msg.chatType === 2) return 'row-system'
+  if (msg.chatType === 2 || msg.recalled) return 'row-system'
   return isSelfMessage(msg) ? 'row-self' : 'row-other'
+}
+
+// ---- Message capability: @ / recall ----
+
+function isMentioned(msg) {
+  if (msg.atAll) return true
+  if (!msg.atUsers) return false
+  try {
+    const arr = JSON.parse(msg.atUsers)
+    return Array.isArray(arr) && arr.includes(auth.userId)
+  } catch {
+    return false
+  }
+}
+
+function openContextMenu(e, msg) {
+  if (msg.chatType === 2 || msg.recalled || !isSelfMessage(msg)) return
+  contextMenu.visible = true
+  contextMenu.x = e.clientX
+  contextMenu.y = e.clientY
+  contextMenu.message = msg
+}
+
+function closeContextMenu() {
+  contextMenu.visible = false
+  contextMenu.message = null
+}
+
+async function handleRecall() {
+  const msg = contextMenu.message
+  closeContextMenu()
+  if (!msg) return
+  try {
+    await chatStore.recallMessage(msg.id)
+    ElMessage.success('消息已撤回')
+  } catch (e) {
+    // 错误已由拦截器提示
+  }
 }
 
 function bubbleClass(msg) {
@@ -721,6 +784,11 @@ watch(() => chatStore.activeShowId, () => {
 
 onMounted(() => {
   scrollToBottom()
+  document.addEventListener('click', closeContextMenu)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('click', closeContextMenu)
 })
 </script>
 
@@ -854,6 +922,66 @@ onMounted(() => {
   color: #b0b0b0;
   background: #e8e8e8;
   border-radius: 4px;
+}
+
+/* ---- Recalled message ---- */
+.recalled-msg {
+  text-align: center;
+  max-width: 80%;
+}
+
+.recalled-msg span {
+  display: inline-block;
+  padding: 4px 14px;
+  font-size: 12px;
+  color: #b0b0b0;
+  background: #e8e8e8;
+  border-radius: 4px;
+}
+
+/* ---- Capability badges ---- */
+.msg-badges {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 2px;
+  padding: 0 4px;
+}
+
+.msg-badge {
+  font-size: 10px;
+  color: #909399;
+  background: #f0f0f0;
+  padding: 1px 6px;
+  border-radius: 3px;
+  line-height: 1.4;
+}
+
+.msg-badge-at {
+  color: #f56c6c;
+  background: #fef0f0;
+}
+
+/* ---- Recall context menu ---- */
+.recall-menu {
+  position: fixed;
+  z-index: 2000;
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  padding: 4px 0;
+  min-width: 90px;
+}
+
+.recall-menu-item {
+  padding: 7px 16px;
+  font-size: 13px;
+  color: #303133;
+  cursor: pointer;
+}
+
+.recall-menu-item:hover {
+  background: #f5f5f5;
 }
 
 /* ---- Avatar ---- */

@@ -23,4 +23,24 @@ public class SendMessageVo {
      */
     private String content;
 
+    /**
+     * 引用消息ID（深度1层）
+     */
+    private String replyTo;
+
+    /**
+     * @提及的用户ID列表（JSON数组字符串）
+     */
+    private String atUsers;
+
+    /**
+     * 是否@所有人
+     */
+    private Boolean atAll;
+
+    /**
+     * 转发来源消息ID
+     */
+    private String forwardFrom;
+
 }

@@ -9,6 +9,7 @@ import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.Id;
 import javax.persistence.Table;
+import javax.persistence.UniqueConstraint;
 import java.io.Serializable;
 
 /**
@@ -19,7 +20,8 @@ import java.io.Serializable;
 @NoArgsConstructor
 @Builder
 @Entity
-@Table(name = "group_member_table")
+@Table(name = "group_member_table",
+        uniqueConstraints = @UniqueConstraint(columnNames = {"group_id", "user_id"}))
 public class GroupMemberEntity implements Serializable {
 
     @Id

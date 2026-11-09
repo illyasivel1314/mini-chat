@@ -19,10 +19,10 @@
         class="login-form"
         @submit.prevent="handleLogin"
       >
-        <el-form-item prop="username">
+        <el-form-item prop="phone">
           <el-input
-            v-model="form.username"
-            placeholder="请输入用户名"
+            v-model="form.phone"
+            placeholder="请输入手机号"
             size="large"
             :prefix-icon="User"
             clearable
@@ -58,8 +58,8 @@
       </div>
 
       <div class="login-hint">
-        <p>演示账号：任意用户名 + 任意密码即可登录</p>
-        <p>建议使用：张三、李四、王五</p>
+        <p>请使用手机号登录</p>
+        <p>忘记密码请联系管理员重置</p>
       </div>
     </div>
   </div>
@@ -77,12 +77,15 @@ const formRef = ref(null)
 const loading = ref(false)
 
 const form = reactive({
-  username: '',
+  phone: '',
   password: ''
 })
 
 const rules = {
-  username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
+  phone: [
+    { required: true, message: '请输入手机号', trigger: 'blur' },
+    { pattern: /^1[3-9]\d{9}$/, message: '手机号格式不正确', trigger: 'blur' }
+  ],
   password: [{ required: true, message: '请输入密码', trigger: 'blur' }]
 }
 
@@ -96,7 +99,7 @@ async function handleLogin() {
 
   loading.value = true
   try {
-    await auth.login(form.username, form.password)
+    await auth.login(form.phone, form.password)
     router.push('/chatWindow')
   } catch (e) {
     // Error handled by interceptor

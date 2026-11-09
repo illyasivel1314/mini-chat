@@ -4,6 +4,17 @@ import { useAuthStore } from './auth'
 import request from '../utils/request'
 import { useWebSocket } from '../utils/webSocket';
 import avatarUri from '../utils/emoji'
+import { ElMessage } from 'element-plus'
+import { Md5 } from 'ts-md5'
+
+// 会话ID解析（与后端 ConversationService.resolveConversationId 规则一致）
+function resolveConversationId(chatType, senderId, receiverId) {
+  if (chatType === 1) return receiverId        // 群聊 = groupId
+  if (chatType === 3) return Md5.hashStr('self|' + senderId)
+  if (chatType === 2) return Md5.hashStr('system|' + receiverId)
+  const [a, b] = senderId < receiverId ? [senderId, receiverId] : [receiverId, senderId]
+  return Md5.hashStr('p|' + a + '|' + b)
+}
 
 export const useChatStore = defineStore('chat', () => {
   // 聊天对象列表
@@ -65,7 +76,7 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   async function loadGroups() {
-    return await request.post('/auth/group/list', { })
+    return await request.get('/auth/group/list', { })
   }
 
   // ---- Group operations ----
@@ -99,8 +110,15 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   async function setActiveChat(showId, type, name, avatar) {
+    const auth = useAuthStore()
     activeShowId.value = showId
-    activeChat.value = { show_id: showId, type, name, avatar }
+    activeChat.value = {
+      show_id: showId,
+      type,
+      name,
+      avatar,
+      conversationId: resolveConversationId(type, auth.userId, showId)
+    }
     currentPage.value = 0
     hasMore.value = true
     loadingMore.value = false
@@ -143,32 +161,67 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   /**
-   * 私聊
+   * 统一消息入口：私聊/群聊消息均经 /user/queue/private 推送，按 conversationId 归属会话
    */
-  async function uploadPrivateLatestMessage(message) {
+  async function uploadMessage(message) {
+    // 撤回消息：原地替换而不是追加
+    if (message.recalled) {
+      replaceIfRecalled(message)
+      await loadConversations()
+      return
+    }
     // 左侧会话列表也需要更新最新消息
     await loadConversations()
     const auth = useAuthStore()
-    // 发给我的消息
-    if (activeChat.value && message.receiverId === auth.userId && message.senderId === activeChat.value.show_id) {
-      await markMessagesAsRead(activeChat.value.show_id)
+    // 根据会话ID识别消息归属于哪个会话
+    if (activeChat.value && message.conversationId === activeChat.value.conversationId) {
+      // 发给我的私聊消息（当前会话已激活）→ 标记已读
+      if (message.chatType === 0 && message.senderId !== auth.userId) {
+        markMessagesAsRead(activeChat.value.show_id)
+      }
       messages.value.push(message)
-    } else if (activeChat.value && message.receiverId === activeChat.value.show_id) { // 我发给对方的消息
-      messages.value.push(message)
-    } 
+    }
   }
 
   /**
-   * 群聊
+   * 系统消息（广播）：仅处理发给自己的，刷新会话并弹提示
    */
-  async function uploadGroupLatestMessage(message) {
-    // 左侧会话列表也需要更新最新消息
-    await loadConversations()
+  async function uploadSystemMessage(message) {
     const auth = useAuthStore()
-    // 消息的接收者是群聊，且当前激活的聊天对象是该群聊
-    if (activeChat.value && message.receiverId === activeChat.value.show_id) {
-      messages.value.push(message)
+    if (message.receiverId !== auth.userId) return
+    await loadConversations()
+    const text = parseSystemText(message.content)
+    if (text) ElMessage.info(text)
+  }
+
+  function parseSystemText(content) {
+    try {
+      return JSON.parse(content).content || ''
+    } catch {
+      return ''
     }
+  }
+
+  /**
+   * 撤回消息（仅本人、2 分钟内）
+   */
+  async function recallMessage(messageId) {
+    const dto = await request.post('/chat/message/recall', null, { params: { messageId } })
+    replaceIfRecalled(dto)
+    return dto
+  }
+
+  /**
+   * 将撤回消息原地替换（若存在于当前会话）
+   */
+  function replaceIfRecalled(message) {
+    if (!message.recalled) return false
+    const idx = messages.value.findIndex(m => m.id === message.id)
+    if (idx !== -1) {
+      messages.value[idx] = { ...messages.value[idx], ...message, recalled: true }
+      return true
+    }
+    return false
   }
 
   async function uploadFile(file) {
@@ -204,8 +257,9 @@ export const useChatStore = defineStore('chat', () => {
     loadMoreMessages,
     sendMessage,
     refreshMessages,
-    uploadPrivateLatestMessage,
-    uploadGroupLatestMessage,
-    markMessagesAsRead
+    uploadMessage,
+    uploadSystemMessage,
+    markMessagesAsRead,
+    recallMessage
   }
 })

@@ -40,6 +40,11 @@ public class ChatMessageDto {
     private String receiverId;
 
     /**
+     * 会话ID（sessionWindowId）
+     */
+    private String conversationId;
+
+    /**
      * 聊天类型：PRIVATE / GROUP / SYSTEM
      */
     private int chatType;
@@ -63,4 +68,29 @@ public class ChatMessageDto {
      * 是否已读
      */
     private Boolean isRead;
+
+    /**
+     * 引用消息ID
+     */
+    private String replyTo;
+
+    /**
+     * @提及的用户ID列表（JSON数组字符串）
+     */
+    private String atUsers;
+
+    /**
+     * 是否@所有人
+     */
+    private Boolean atAll;
+
+    /**
+     * 转发来源消息ID
+     */
+    private String forwardFrom;
+
+    /**
+     * 是否撤回
+     */
+    private Boolean recalled;
 }

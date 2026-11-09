@@ -13,6 +13,8 @@ import com.cetc28s.minichatjava.model.entity.ChatGroupEntity;
 import com.cetc28s.minichatjava.model.entity.GroupMemberEntity;
 import com.cetc28s.minichatjava.model.entity.MessageEntity;
 import com.cetc28s.minichatjava.model.entity.UserEntity;
+import com.cetc28s.minichatjava.model.enums.ChatTypeEnum;
+import com.cetc28s.minichatjava.utils.CommonUtil;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
@@ -41,6 +43,9 @@ public class MessageService {
 
     @Resource
     private ChatGroupDao chatGroupDao;
+
+    @Resource
+    private ConversationService conversationService;
 
     /**
      * 保存消息并返回填充了发送者信息的 DTO
@@ -97,7 +102,7 @@ public class MessageService {
     }
 
     /**
-     * 标记消息为已读
+     * 标记消息为已读（同时更新会话成员已读位点）
      */
     public void markAsRead(String receiveId, String senderId) {
 
@@ -106,6 +111,32 @@ public class MessageService {
             msg.setIsRead(true);
             messageDao.save(msg);
         }
+        // 清空 conversation_member 的未读/@角标
+        String conversationId = conversationService.resolveConversationId(
+                ChatTypeEnum.PRIVATE.getValue(), receiveId, senderId);
+        conversationService.markRead(conversationId, receiveId);
+    }
+
+    /**
+     * 撤回消息（仅本人、发送后 2 分钟内）
+     */
+    public ChatMessageDto recallMessage(String messageId, String currentUserId) {
+        MessageEntity message = messageDao.findById(messageId)
+                .orElseThrow(() -> new BusinessException(ErrorCodeEnum.USER_NOT_FOUND));
+        if (!message.getSenderId().equals(currentUserId)) {
+            throw new BusinessException(ErrorCodeEnum.PERMISSION_DENIED);
+        }
+        long now = CommonUtil.generateTimestamp();
+        if (message.getTimestamp() != null && now - message.getTimestamp() > 2 * 60 * 1000L) {
+            throw new BusinessException(ErrorCodeEnum.RECALL_TIMEOUT);
+        }
+        message.setRecalled(true);
+        message.setRecallTime(now);
+        messageDao.save(message);
+
+        UserEntity sender = userDao.findById(currentUserId)
+                .orElseThrow(() -> new BusinessException(ErrorCodeEnum.USER_NOT_FOUND));
+        return MessageConverter.MAPPER.convertChatMessageDto(message, sender);
     }
 
     /**
@@ -138,7 +169,12 @@ public class MessageService {
 
         return messageEntityList
                 .stream()
-                .map(message -> MessageConverter.MAPPER.convertChatFriendDto(message, chatGroupEntityMap.get(message.getReceiverId())))
+                .map(message -> {
+                    ChatFriendDto dto = MessageConverter.MAPPER.convertChatFriendDto(message, chatGroupEntityMap.get(message.getReceiverId()));
+                    // 群聊会话ID即群组ID
+                    dto.setConversationId(message.getReceiverId());
+                    return dto;
+                })
                 .collect(Collectors.toList());
     }
 
@@ -189,7 +225,11 @@ public class MessageService {
                 .map(message -> {
                     String friendId = message.getSenderId().equals(currentUserId) ? message.getReceiverId() : message.getSenderId();
                     long unreadNum = messageDao.countAllBySenderIdAndReceiverIdAndIsReadFalse(friendId, currentUserId);
-                    return MessageConverter.MAPPER.convertChatFriendDto(message, userEntityMap.get(friendId), unreadNum);
+                    ChatFriendDto dto = MessageConverter.MAPPER.convertChatFriendDto(message, userEntityMap.get(friendId), unreadNum);
+                    // 私聊会话ID：双方按固定规则复用同一会话
+                    dto.setConversationId(conversationService.resolveConversationId(
+                            ChatTypeEnum.PRIVATE.getValue(), currentUserId, friendId));
+                    return dto;
                 })
                 .collect(Collectors.toList());
 

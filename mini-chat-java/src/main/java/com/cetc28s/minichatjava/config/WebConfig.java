@@ -1,5 +1,6 @@
 package com.cetc28s.minichatjava.config;
 
+import com.cetc28s.minichatjava.interrupt.AdminAuthInterceptor;
 import com.cetc28s.minichatjava.interrupt.TokenInterceptor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
@@ -18,15 +19,23 @@ public class WebConfig implements WebMvcConfigurer {
     @Resource
     private TokenInterceptor tokenInterceptor;
 
+    @Resource
+    private AdminAuthInterceptor adminAuthInterceptor;
+
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(tokenInterceptor)
                 // 拦截所有请求
                 .addPathPatterns("/api/**")
-                // 放行登录、注册等不需要Token的接口
-                .excludePathPatterns("/api/auth/login", "/api/auth/register", "/api/file/upload")
+                // 放行登录、注册等不需要Token的接口，admin 后台单独鉴权
+                .excludePathPatterns("/api/auth/login", "/api/auth/register", "/api/file/upload", "/api/admin/**")
                 // 放行 WebSocket 端点
                 .excludePathPatterns("/ws/**");
+
+        // admin 后台独立鉴权
+        registry.addInterceptor(adminAuthInterceptor)
+                .addPathPatterns("/api/admin/**")
+                .excludePathPatterns("/api/admin/login");
     }
 
     @Override

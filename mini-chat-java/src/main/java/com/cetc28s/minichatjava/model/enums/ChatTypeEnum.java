@@ -20,7 +20,11 @@ public enum ChatTypeEnum {
     /**
      * 系统消息
      */
-    SYSTEM("system", 2);
+    SYSTEM("system", 2),
+    /**
+     * 自发会话（“我的文件”）
+     */
+    SELF("self", 3);
 
     private String key;
 
